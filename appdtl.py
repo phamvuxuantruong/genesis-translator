@@ -128,7 +128,7 @@ def process_document(file):
 
 # --- GIAO DIỆN STREAMLIT ---
 st.set_page_config(page_title="Autonomous Agent v36.0", layout="wide")
-st.title("🧠 Dịch tài liệu chuyên ngành (docx)")
+st.title("🔃 Dịch tài liệu chuyên ngành (docx)")
 st.markdown("Hệ thống biên dịch AI Tự trị: **Tự động nhận diện chuyên ngành** & **Bảo toàn Sơ đồ vật lý**.")
 
 uploaded_file = st.file_uploader("Tải lên file Word (.docx) Tiếng Anh bất kỳ", type="docx")
