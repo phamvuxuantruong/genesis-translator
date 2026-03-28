@@ -7,13 +7,20 @@ import time
 
 # --- BẢO MẬT API KEY BẰNG KÉT SẮT CLOUD ---
 try:
-    api_key = st.secrets["GEMINI_API_KEY"] # Đã đổi tên biến trong két sắt
+    api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-    # Khởi tạo model Gemini 1.5 Pro (Mạnh nhất cho text/logic)
     model = genai.GenerativeModel('gemini-1.5-pro')
 except KeyError:
     st.error("❌ CẢNH BÁO BẢO MẬT: Chưa cấu hình GEMINI_API_KEY trong Két sắt (Secrets) của Streamlit.")
     st.stop()
+
+# Tắt bộ lọc an toàn để tránh việc Gemini từ chối dịch tài liệu kỹ thuật
+SAFETY_SETTINGS = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+]
 
 def auto_detect_domain(doc):
     """CONTEXT SNIFFER: Đọc lướt tài liệu để tự nhận diện chuyên ngành."""
@@ -26,15 +33,17 @@ def auto_detect_domain(doc):
             
     if not sample_text: return "Tài liệu kỹ thuật tổng hợp"
 
-    prompt = f"""Bạn là chuyên gia phân tích dữ liệu. Đọc đoạn văn bản sau và trả lời bằng MỘT CỤM TỪ DUY NHẤT chỉ định lĩnh vực chuyên môn sâu của nó (Ví dụ: 'Quản lý dự án (PMP)', 'Kỹ thuật Cơ khí', 'Y khoa', 'Luật Thương mại'). KHÔNG giải thích thêm.
+    prompt = f"""Bạn là chuyên gia phân tích dữ liệu. Đọc đoạn văn bản sau và trả lời bằng MỘT CỤM TỪ DUY NHẤT chỉ định lĩnh vực chuyên môn sâu của nó (Ví dụ: 'Quản lý dự án (PMP)', 'Kỹ thuật Cơ khí', 'Y khoa'). KHÔNG giải thích thêm.
     
     VĂN BẢN:
     {sample_text}"""
 
     try:
+        # Sửa lại cú pháp generation_config thành dictionary an toàn
         response = model.generate_content(
             prompt,
-            generation_config=genai.types.GenerationConfig(temperature=0.2)
+            generation_config={"temperature": 0.2},
+            safety_settings=SAFETY_SETTINGS
         )
         domain = response.text.strip()
         return domain.replace('"', '').replace("'", "")
@@ -47,33 +56,37 @@ def autonomous_translate(text, detected_domain):
     if not clean_text or len(clean_text) <= 2: 
         return text
 
-    prompt = f"""Bạn là cỗ máy biên dịch cấp cao.
-LĨNH VỰC TỰ ĐỘNG NHẬN DIỆN: {detected_domain}. 
-Nhiệm vụ của bạn là DỊCH TOÀN BỘ VĂN BẢN GỐC SANG TIẾNG VIỆT.
-Hãy tự động sử dụng hệ thống thuật ngữ chuyên sâu, học thuật và chuẩn xác nhất của lĩnh vực này (Ví dụ nếu là PMP thì 'Baseline' giữ nguyên, 'Coordinator' là 'Điều phối viên'...).
+    # Prompt ép buộc Tiếng Việt mạnh mẽ nhất
+    prompt = f"""Bạn là chuyên gia dịch thuật kỹ thuật cấp cao.
+Ngữ cảnh tài liệu: {detected_domain}
 
-QUY TẮC TỬ THẦN (VI PHẠM SẼ BỊ HỦY DIỆT):
-1. CHỈ trả về bản dịch bằng TIẾNG VIỆT. KHÔNG giải thích, KHÔNG định nghĩa, KHÔNG tự sáng tác thêm nội dung.
-2. Nếu văn bản gốc là một cụm từ ngắn (VD: "Definition", "Overview"), CHỈ dịch đúng chữ đó. Tuyệt đối cấm giải thích ý nghĩa.
-3. Không chào hỏi, không chứa dấu ngoặc kép bọc ngoài kết quả.
+LỆNH BẮT BUỘC: DỊCH ĐOẠN VĂN BẢN SAU SANG TIẾNG VIỆT.
 
-VĂN BẢN CẦN DỊCH:
+Yêu cầu khắt khe:
+1. Trả về DUY NHẤT bản dịch tiếng Việt, KHÔNG giải thích, KHÔNG bình luận, KHÔNG thêm dấu ngoặc kép.
+2. Giữ nguyên các thuật ngữ chuyên ngành tiếng Anh nếu nó là chuẩn mực quốc tế (Ví dụ: BIM, CAD, Baseline).
+3. Tuyệt đối bám sát nghĩa gốc, hành văn chuyên nghiệp.
+
+VĂN BẢN GỐC (CẦN DỊCH SANG TIẾNG VIỆT):
 {clean_text}"""
 
     try:
         response = model.generate_content(
             prompt,
-            generation_config=genai.types.GenerationConfig(temperature=0.0)
+            generation_config={"temperature": 0.0},
+            safety_settings=SAFETY_SETTINGS
         )
         translated = response.text.strip()
 
         # Chatter Guard
-        forbidden_words = ["xin chào", "giúp đỡ", "ngữ cảnh", "cung cấp", "hỗ trợ", "đây là bản dịch"]
+        forbidden_words = ["xin chào", "giúp đỡ", "ngữ cảnh", "cung cấp", "hỗ trợ", "đây là bản dịch", "văn bản gốc"]
         if len(clean_text.split()) <= 2 and any(word in translated.lower() for word in forbidden_words):
             return text
             
         return translated
-    except Exception:
+    except Exception as e:
+        # Nếu lỗi vẫn xảy ra, in ngầm ra console để debug chứ không crash web
+        print(f"Lỗi dịch: {e}") 
         return text
 
 def safe_replace_text(p, translated_text):
@@ -112,7 +125,7 @@ def process_document(file):
     progress_bar = st.progress(0)
     current_step = 0
 
-    st.write("Đang dịch thuật và bảo toàn sơ đồ khối...")
+    st.write("Đang dịch thuật sang Tiếng Việt và bảo toàn sơ đồ khối...")
     for p_xml in all_p_xml:
         p = Paragraph(p_xml, doc)
         full_text = p.text.strip()
@@ -133,10 +146,10 @@ st.set_page_config(page_title="Autonomous Agent v36.0", layout="wide")
 st.title("🧠 Genesis Autonomous Agent v36.0 (Gemini Powered)")
 st.markdown("Hệ thống biên dịch AI Tự trị: **Tự động nhận diện chuyên ngành** & **Bảo toàn Sơ đồ vật lý**.")
 
-uploaded_file = st.file_uploader("Tải lên file Word (.docx) bất kỳ", type="docx")
+uploaded_file = st.file_uploader("Tải lên file Word (.docx) Tiếng Anh bất kỳ", type="docx")
 
 if uploaded_file:
-    if st.button("🚀 BẮT ĐẦU XỬ LÝ TỰ ĐỘNG", use_container_width=True):
+    if st.button("🚀 BẮT ĐẦU DỊCH SANG TIẾNG VIỆT", use_container_width=True):
         start_time = time.time()
         result = process_document(uploaded_file)
         
@@ -147,7 +160,7 @@ if uploaded_file:
             st.download_button(
                 label="📥 TẢI FILE CHUẨN XUẤT BẢN",
                 data=result,
-                file_name=f"Auto_Translated_{uploaded_file.name}",
+                file_name=f"Translated_VI_{uploaded_file.name}",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
             )
