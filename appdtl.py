@@ -49,10 +49,11 @@ def autonomous_translate(text, detected_domain):
 
     prompt = f"""Bạn là cỗ máy biên dịch cấp cao.
 LĨNH VỰC TỰ ĐỘNG NHẬN DIỆN: {detected_domain}. 
-Hãy tự động sử dụng hệ thống thuật ngữ chuyên sâu, học thuật và chuẩn xác nhất của lĩnh vực này (Ví dụ nếu là PMP thì 'Baseline' giữ nguyên, 'Coordinator' là Điều phối viên...).
+Nhiệm vụ của bạn là DỊCH TOÀN BỘ VĂN BẢN GỐC SANG TIẾNG VIỆT.
+Hãy tự động sử dụng hệ thống thuật ngữ chuyên sâu, học thuật và chuẩn xác nhất của lĩnh vực này (Ví dụ nếu là PMP thì 'Baseline' giữ nguyên, 'Coordinator' là 'Điều phối viên'...).
 
 QUY TẮC TỬ THẦN (VI PHẠM SẼ BỊ HỦY DIỆT):
-1. CHỈ trả về bản dịch. KHÔNG giải thích, KHÔNG định nghĩa, KHÔNG tự sáng tác thêm nội dung.
+1. CHỈ trả về bản dịch bằng TIẾNG VIỆT. KHÔNG giải thích, KHÔNG định nghĩa, KHÔNG tự sáng tác thêm nội dung.
 2. Nếu văn bản gốc là một cụm từ ngắn (VD: "Definition", "Overview"), CHỈ dịch đúng chữ đó. Tuyệt đối cấm giải thích ý nghĩa.
 3. Không chào hỏi, không chứa dấu ngoặc kép bọc ngoài kết quả.
 
